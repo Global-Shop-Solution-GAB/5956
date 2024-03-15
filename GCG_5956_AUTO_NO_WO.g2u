@@ -1,0 +1,263 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Variable.Global.sJob.Declare(String)
+Variable.Global.sOrder.Declare(String)
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.Try
+V.Local.sSql.Declare(String)
+V.Local.sUser5.Declare(String)
+
+'TJS Apr 2020 - Modified to update error handling and to convert century from
+'lettering schema back to number.  Additionally, updated to G2U.
+'Kept original SQl table to maintain continuity with existing programs (GCG_AUTO_NO_SO)
+
+'Original project GCG_Auto_No_SO.gas by Billy Sellers for Quote 5425 on 4/24/14
+'11872 - Order Header Post Save
+'11560 - Order Header Populate
+'32810 - User Fields Populate
+
+F.ODBC.connection!conts.OpenCompanyConnection
+
+F.Intrinsic.Control.If(V.Caller.Hook,=,"11560")
+
+	F.Intrinsic.String.LPad(V.Passed.000003,"0",7,V.Global.sOrder)
+
+	F.Intrinsic.Control.If(V.Caller.Switches,=,"O")
+		F.Intrinsic.Control.If(V.Global.sOrder,<>,"")
+			F.Intrinsic.String.Concat("Select USER_5 From ORDER_HEADER Where ORDER_NO = '",V.Global.sOrder,"' And RECORD_TYPE = 'A'",V.Local.sSql)
+			F.ODBC.Connection!conts.OpenLocalRecordsetRW("rstOrder",V.Local.sSQL)
+			F.Intrinsic.Control.If(V.ODBC.conts!rstOrder.EOF,<>,True)
+				F.Intrinsic.Control.If(V.ODBC.conts!rstOrder.FieldValTrim!USER_5,=,"")
+					F.Intrinsic.Control.CallSub(GetNewOrder)
+					F.ODBC.conts!rstOrder.Set!USER_5(V.Args.sNewOrder)
+					F.ODBC.conts!rstOrder.update
+				F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.EndIf
+			F.ODBC.conts!rstOrder.Close
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ElseIf(V.Caller.Hook,=,"11872")
+
+	F.Intrinsic.String.LPad(V.Passed.000003,"0",7,V.Global.sOrder)
+
+	F.Intrinsic.Control.If(V.Caller.Switches,=,"N")
+		F.Intrinsic.String.Concat("Select USER_5 From ORDER_HEADER Where ORDER_NO = '",V.Global.sOrder,"' And RECORD_TYPE = 'A'",V.Local.sSql)
+		F.ODBC.Connection!conts.OpenLocalRecordsetRW("rstOrder",V.Local.sSQL)
+		F.Intrinsic.Control.If(V.ODBC.conts!rstOrder.EOF,<>,True)
+			F.Intrinsic.Control.If(V.ODBC.conts!rstOrder.FieldValTrim!USER_5,=,"")
+				F.Intrinsic.Control.CallSub(GetNewOrder)
+				F.ODBC.conts!rstOrder.Set!USER_5(V.Args.sNewOrder)
+				F.ODBC.conts!rstOrder.update
+			F.Intrinsic.Control.EndIf
+		F.Intrinsic.Control.EndIf
+		F.ODBC.conts!rstOrder.Close
+	F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ElseIf(V.Caller.Hook,=,"32810")
+
+	F.Intrinsic.String.LPad(V.Passed.000024,"0",7,V.Global.sOrder)
+	
+	F.Intrinsic.Control.If(V.Passed.000011,=,"")
+		F.Intrinsic.Control.If(V.Passed.000014,=,"Order")
+		
+			F.Intrinsic.String.Concat("Select USER_5 From ORDER_HEADER Where ORDER_NO = '",V.Global.sOrder,"' And RECORD_TYPE = 'A'",V.Local.sSql)
+			F.ODBC.Connection!conts.OpenLocalRecordsetRW("rstOrder",V.Local.sSQL)
+
+			F.Intrinsic.Control.If(V.ODBC.conts!rstOrder.EOF,=,False)
+				F.Intrinsic.Control.If(V.ODBC.conts!rstOrder.FieldValTrim!User_5,=,"")
+					F.Intrinsic.Control.CallSub(GetNewOrder)
+					V.Local.sUser5.Set(V.Args.sNewOrder)
+			F.Intrinsic.Control.Else
+					V.Local.sUser5.Set(V.ODBC.conts!rstOrder.FieldValLTrim!User_5)
+				F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.Else
+				F.Intrinsic.Control.CallSub(GetNewOrder)
+				V.Local.sUser5.Set(V.Args.sNewOrder)
+			F.Intrinsic.Control.EndIf
+
+			F.Intrinsic.Control.If(V.ODBC.conts!rstOrder.EOF,<>,True)
+				F.Intrinsic.Control.If(V.ODBC.conts!rstOrder.FieldValTrim!USER_5,=,"")
+					F.ODBC.conts!rstOrder.Set!USER_5(V.Args.sNewOrder)
+					F.ODBC.conts!rstOrder.update
+					V.Local.sUser5.Set(V.Args.sNewOrder)
+				F.Intrinsic.Control.Else
+						V.Local.sUser5.Set(V.ODBC.conts!rstOrder.FieldValTrim!User_5)
+				F.Intrinsic.Control.EndIf
+
+			F.Intrinsic.Control.EndIf
+			
+			V.Passed.000011.Set(V.Local.sUser5)
+			
+			F.ODBC.conts!rstOrder.Close
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conts.Close
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.GetNewOrder.Start
+F.Intrinsic.Control.Try
+V.Local.sNewOrder.Declare(String)
+V.Local.sSql.Declare(String)
+V.Local.sMonth.Declare(String)
+V.Local.sYear.Declare(String)
+V.Local.sCentury.Declare(String)
+V.Local.iCounter.Declare(Long)
+V.Local.sCounter.Declare(String)
+
+F.Intrinsic.Control.CallSub(Getmonth)
+V.Local.sMonth.Set(V.Args.sRet)
+
+F.Intrinsic.Control.CallSub(Getyear)
+V.Local.sYear.Set(V.Args.sRet)
+
+F.Intrinsic.Control.CallSub(Getcentury)
+V.Local.sCentury.Set(V.Args.sRet)
+
+V.Local.sSql.Set("Select COUNTER, MONTH From GCG_AUTO_NO_SO")
+F.ODBC.Connection!conts.OpenLocalRecordsetRO("rst",V.Local.sSQL)
+F.Intrinsic.Control.If(V.ODBC.conts!rst.EOF,<>,True)
+	F.Intrinsic.Control.If(V.ODBC.conts!rst.FieldValTrim!MONTH,=,V.Local.sMonth)
+		V.Local.iCounter.Set(V.ODBC.conts!rst.FieldValTrim!COUNTER)
+	F.Intrinsic.Control.Else
+		V.Local.iCounter.Set(0)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Else
+	V.Local.iCounter.Set(0)
+F.Intrinsic.Control.EndIf
+F.ODBC.conts!rst.Close
+
+F.Intrinsic.Math.Add(V.Local.iCounter,1,V.Local.iCounter)
+F.Intrinsic.Control.If(V.Local.iCounter,<,1000)
+	F.Intrinsic.String.LPad(V.Local.iCounter,"0",3,V.Local.sCounter)
+F.Intrinsic.Control.EndIf
+F.Intrinsic.String.Concat(V.Local.sCentury,V.Local.sYear,V.Local.sMonth,V.Local.sCounter,V.Local.sNewOrder)
+
+F.ODBC.Connection!conts.OpenLocalRecordsetRW("rst","Select * From GCG_AUTO_NO_SO")
+F.Intrinsic.Control.If(V.ODBC.conts!rst.EOF,<>,True)
+	F.ODBC.conts!rst.Set!ORDER(V.Local.sNewOrder)
+	F.ODBC.conts!rst.Set!CENTURY(V.Local.sCentury)
+	F.ODBC.conts!rst.Set!MONTH(V.Local.sMonth)
+	F.ODBC.conts!rst.Set!YEAR(V.Local.sYear)
+	F.ODBC.conts!rst.Set!COUNTER(V.local.iCounter)
+	F.ODBC.conts!rst.update
+F.Intrinsic.Control.Else
+	F.ODBC.conts!rst.AddNew
+	F.ODBC.conts!rst.Set!ORDER(V.Local.sNewOrder)
+	F.ODBC.conts!rst.Set!CENTURY(V.Local.sCentury)
+	F.ODBC.conts!rst.Set!MONTH(V.Local.sMonth)
+	F.ODBC.conts!rst.Set!YEAR(V.Local.sYear)
+	F.ODBC.conts!rst.Set!COUNTER(V.local.iCounter)
+	F.ODBC.conts!rst.update
+F.Intrinsic.Control.EndIf
+F.ODBC.conts!rst.Close
+
+F.Intrinsic.Variable.AddRV("sNewOrder",V.Local.sNewOrder)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.GetNewOrder.End
+
+Program.Sub.GetCentury.Start
+F.Intrinsic.Control.Try
+V.Local.sRet.Declare(String)
+V.Local.sYear.Declare(String)
+
+'5956 - Modified to bring only the left digit of the year and removed original lettering system
+
+F.Intrinsic.Date.Year(V.Ambient.Date,V.Local.sYear)
+
+F.Intrinsic.String.Left(V.Local.sYear,1,V.Local.sRet)
+
+F.Intrinsic.Variable.AddRV("sRet",V.Local.sRet)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.GetCentury.End
+
+Program.Sub.GetYear.Start
+F.Intrinsic.Control.Try
+V.Local.sRet.Declare(String)
+V.Local.sYear.Declare(String)
+
+F.Intrinsic.Date.Year(V.Ambient.Date,V.Local.sYear)
+
+F.Intrinsic.String.Right(V.Local.sYear,1,V.Local.sRet)
+
+F.Intrinsic.Variable.AddRV("sRet",V.Local.sRet)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.GetYear.End
+
+Program.Sub.GetMonth.Start
+F.Intrinsic.Control.Try
+V.Local.sRet.Declare(String)
+V.Local.iMonth.Declare(String)
+
+F.Intrinsic.Date.Month(V.Ambient.Date,V.Local.iMonth)
+
+F.Intrinsic.Control.SelectCase(V.Local.iMonth)
+	F.Intrinsic.Control.Case(1)
+		V.Local.sRet.Set("A")
+	F.Intrinsic.Control.Case(2)
+		V.Local.sRet.Set("B")
+	F.Intrinsic.Control.Case(3)
+		V.Local.sRet.Set("C")
+	F.Intrinsic.Control.Case(4)
+		V.Local.sRet.Set("D")
+	F.Intrinsic.Control.Case(5)
+		V.Local.sRet.Set("E")
+	F.Intrinsic.Control.Case(6)
+		V.Local.sRet.Set("F")
+	F.Intrinsic.Control.Case(7)
+		V.Local.sRet.Set("G")
+	F.Intrinsic.Control.Case(8)
+		V.Local.sRet.Set("H")
+	F.Intrinsic.Control.Case(9)
+		V.Local.sRet.Set("I")
+	F.Intrinsic.Control.Case(10)
+		V.Local.sRet.Set("J")
+	F.Intrinsic.Control.Case(11)
+		V.Local.sRet.Set("K")
+	F.Intrinsic.Control.Case(12)
+		V.Local.sRet.Set("L")
+F.Intrinsic.Control.EndSelect
+
+F.Intrinsic.Variable.AddRV("sRet",V.Local.sRet)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.GetMonth.End
+
+Program.Sub.Error.Start
+V.Local.sError.Declare
+V.Local.iRet.Declare
+V.Local.sSep.Declare
+
+F.Intrinsic.String.Build("-------------------------------------------------------------------------------------",,V.Local.sSep)
+F.Intrinsic.String.Build("({5}-{6}){0}{7}{0}Project: {4}{0}{7}{0}Sub: {1}{0}Error: {2}, {3}", V.Ambient.NewLine, V.Args.SubRoutine, V.Args.eNumber, V.Args.eDescription,V.Caller.ScriptFile,V.Ambient.Date, V.Ambient.Time,V.Local.sSep,V.Local.sError)
+F.Intrinsic.UI.Msgbox(V.Local.sError,"Error",V.Local.iRet)
+Program.Sub.Error.End
